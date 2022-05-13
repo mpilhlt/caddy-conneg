@@ -1,0 +1,68 @@
+localhost {
+
+  # Define named matchers satisfying a combination of content request specs
+  @rdf {
+    conneg {
+      match_types application/rdf+xml application/x-turtle
+      force_type_query_string format
+    }
+  }
+
+  @rdfFr {
+    conneg {
+      match_types application/rdf+xml application/x-turtle
+      force_type_query_string format
+      match_languages fr
+      force_language_query_string lang
+    }
+  }
+
+  @rdfDeEn {
+    conneg {
+      match_types application/rdf+xml application/x-turtle
+      force_type_query_string format
+      match_languages de en
+      force_language_query_string lang
+      var_language lang
+    }
+  }
+
+  @htmlBrotli {
+    conneg {
+      match_types text/html
+      force_type_query_string format
+      match_encodings br brotli
+      force_encoding_query_string enc
+    }
+  }
+
+  @html {
+    conneg {
+      match_types text/html
+      force_type_query_string format
+    }
+  }
+
+  # Test with the following:
+
+  respond @rdfFr "RDF en français!
+"
+
+  respond @rdfDeEn "RDF auf deutsch oder englisch, {vars.conneg_lang} preferred!
+"
+
+  respond @rdf "RDF!
+"
+
+  respond @htmlBrotli "HTML, but brotli-compressed!
+"
+
+  respond @html "HTML
+"
+
+  respond "Default
+"
+
+  # If it's working, use like so:
+  # reverse_proxy @rdf localhost:8080
+}

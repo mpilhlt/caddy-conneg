@@ -32,8 +32,8 @@ import (
 // Parameters is a map to represent charset or encoding parameters.
 type Parameters = map[string]string
 
-// Other is s structure to represent charset or encoding with their parameters.
-type Other struct {
+// CharsetOrEncoding is s structure to represent charset or encoding with their parameters.
+type CharsetOrEncoding struct {
 	Value      string
 	Parameters Parameters
 }
@@ -72,8 +72,8 @@ type MatchConneg struct {
 	// the following fields are populated internally/computationally
 	MatchTTypes     []contenttype.MediaType
 	MatchTLanguages []language.Tag
-	MatchTCharsets  []Other
-	MatchTEncodings []Other
+	MatchTCharsets  []CharsetOrEncoding
+	MatchTEncodings []CharsetOrEncoding
 	LanguageMatcher language.Matcher
 	logger          *zap.Logger
 }
@@ -158,11 +158,11 @@ func (m *MatchConneg) Provision(ctx caddy.Context) error {
 	m.LanguageMatcher = language.NewMatcher(m.MatchTLanguages)
 
 	for _, c := range m.MatchCharsets {
-		m.MatchTCharsets = append(m.MatchTCharsets, Other{Value: c})
+		m.MatchTCharsets = append(m.MatchTCharsets, CharsetOrEncoding{Value: c})
 	}
 
 	for _, e := range m.MatchEncodings {
-		m.MatchTEncodings = append(m.MatchTEncodings, Other{Value: e})
+		m.MatchTEncodings = append(m.MatchTEncodings, CharsetOrEncoding{Value: e})
 	}
 
 	// sugar.Infof("Conneg config: %+v", m)
@@ -216,7 +216,7 @@ func (m MatchConneg) Match(r *http.Request) bool {
 	if len(m.MatchCharsets) == 0 {
 		charsetMatch = true
 	} else {
-		charsetMatch, charset = m.matchOther(r, m.MatchCharsets, m.MatchTCharsets, m.ForceCharsetQueryString, "Accept-Charset")
+		charsetMatch, charset = m.matchCharsetOrEncoding(r, m.MatchCharsets, m.MatchTCharsets, m.ForceCharsetQueryString, "Accept-Charset")
 		if charsetMatch && len(m.VarCharset) > 0 {
 			caddyhttp.SetVar(r.Context(), "conneg_"+m.VarCharset, charset)
 		}
@@ -226,7 +226,7 @@ func (m MatchConneg) Match(r *http.Request) bool {
 	if len(m.MatchEncodings) == 0 {
 		encodingMatch = true
 	} else {
-		encodingMatch, encoding = m.matchOther(r, m.MatchEncodings, m.MatchTEncodings, m.ForceEncodingQueryString, "Accept-Encoding")
+		encodingMatch, encoding = m.matchCharsetOrEncoding(r, m.MatchEncodings, m.MatchTEncodings, m.ForceEncodingQueryString, "Accept-Encoding")
 		if encodingMatch && len(m.VarEncoding) > 0 {
 			caddyhttp.SetVar(r.Context(), "conneg_"+m.VarEncoding, encoding)
 		}
@@ -317,7 +317,7 @@ func (m MatchConneg) matchLanguage(r *http.Request, offers []string, forceString
 	return match, result
 }
 
-func (m MatchConneg) matchOther(r *http.Request, offers []string, offerOthers []Other, forceString string, headerName string) (bool, string) {
+func (m MatchConneg) matchCharsetOrEncoding(r *http.Request, offers []string, offerCharsetOrEncodings []CharsetOrEncoding, forceString string, headerName string) (bool, string) {
 	match, result := false, ""
 	if forceString != "" {
 		if err := r.ParseForm(); err != nil {
@@ -348,7 +348,7 @@ func (m MatchConneg) matchOther(r *http.Request, offers []string, offerOthers []
 		var headerValues []string
 		headerValues = append(headerValues, r.Header.Values(headerName)...)
 		for _, a := range headerValues {
-			var other, _, _ = GetAcceptableOtherFromHeader(a, offerOthers)
+			var other, _, _ = getAcceptableCharsetOrEncodingFromHeader(a, offerCharsetOrEncodings)
 			if other.Value != "" {
 				match, result = true, other.Value
 			}
@@ -482,11 +482,11 @@ func getWeight(s string) (int, bool) {
 	return result, true
 }
 
-func compareOthers(checkOther, other Other) bool {
+func compareCharsetOrEncodings(checkCharsetOrEncoding, other CharsetOrEncoding) bool {
 	// RFC 7231, 5.3.2. Accept
-	if other.Value == "*" || checkOther.Value == other.Value {
+	if other.Value == "*" || checkCharsetOrEncoding.Value == other.Value {
 
-		for checkKey, checkValue := range checkOther.Parameters {
+		for checkKey, checkValue := range checkCharsetOrEncoding.Parameters {
 			if value, found := other.Parameters[checkKey]; !found || value != checkValue {
 				return false
 			}
@@ -498,32 +498,32 @@ func compareOthers(checkOther, other Other) bool {
 	return false
 }
 
-func getPrecedence(checkOther, other Other) bool {
+func getPrecedence(checkCharsetOrEncoding, other CharsetOrEncoding) bool {
 	// RFC 7231, 5.3.2. Accept
 	if len(other.Value) == 0 { // not set
 		return true
 	}
 
-	if (other.Value == "*" && checkOther.Value != "*") ||
-		(len(other.Parameters) < len(checkOther.Parameters)) {
+	if (other.Value == "*" && checkCharsetOrEncoding.Value != "*") ||
+		(len(other.Parameters) < len(checkCharsetOrEncoding.Parameters)) {
 		return true
 	}
 
 	return false
 }
 
-// GetAcceptableOtherFromHeader chooses a charset or encoding from available lists according to the specified Accept header value.
+// getAcceptableCharsetOrEncodingFromHeader chooses a charset or encoding from available lists according to the specified Accept header value.
 // Returns the most charset/encoding or an error if none can be selected.
 // This is copied from <> and modified only slightly
-func GetAcceptableOtherFromHeader(headerValue string, availableOthers []Other) (Other, Parameters, error) {
+func getAcceptableCharsetOrEncodingFromHeader(headerValue string, availableCharsetOrEncodings []CharsetOrEncoding) (CharsetOrEncoding, Parameters, error) {
 	s := headerValue
 
 	weights := make([]struct {
-		other               Other
+		other               CharsetOrEncoding
 		extensionParameters Parameters
 		weight              int
 		order               int
-	}, len(availableOthers))
+	}, len(availableCharsetOrEncodings))
 
 	for otherCount := 0; len(s) > 0; otherCount++ {
 		if otherCount > 0 {
@@ -534,12 +534,12 @@ func GetAcceptableOtherFromHeader(headerValue string, availableOthers []Other) (
 			s = s[1:] // skip the comma
 		}
 
-		acceptableOther := Other{
+		acceptableCharsetOrEncoding := CharsetOrEncoding{
 			Parameters: Parameters{},
 		}
 		var consumed bool
-		if acceptableOther.Value, s, consumed = consumeToken(s); !consumed {
-			return Other{}, Parameters{}, errors.New("invalid value in Accept-* string")
+		if acceptableCharsetOrEncoding.Value, s, consumed = consumeToken(s); !consumed {
+			return CharsetOrEncoding{}, Parameters{}, errors.New("invalid value in Accept-* string")
 		}
 
 		weight := 1000 // 1.000
@@ -550,17 +550,17 @@ func GetAcceptableOtherFromHeader(headerValue string, availableOthers []Other) (
 
 			var key, value string
 			if key, value, s, consumed = consumeParameter(s); !consumed {
-				return Other{}, Parameters{}, errors.New("invalid parameter in Accept-* string")
+				return CharsetOrEncoding{}, Parameters{}, errors.New("invalid parameter in Accept-* string")
 			}
 
 			if key == "q" {
 				if weight, consumed = getWeight(value); !consumed {
-					return Other{}, Parameters{}, errors.New("invalid weight in Accept-* string")
+					return CharsetOrEncoding{}, Parameters{}, errors.New("invalid weight in Accept-* string")
 				}
 				break // "q" parameter separates media type parameters from Accept extension parameters
 			}
 
-			acceptableOther.Parameters[key] = value
+			acceptableCharsetOrEncoding.Parameters[key] = value
 		}
 
 		extensionParameters := Parameters{}
@@ -569,7 +569,7 @@ func GetAcceptableOtherFromHeader(headerValue string, availableOthers []Other) (
 
 			var key, value, remaining string
 			if key, value, remaining, consumed = consumeParameter(s); !consumed {
-				return Other{}, Parameters{}, errors.New("invalid parameter in Accept-* string")
+				return CharsetOrEncoding{}, Parameters{}, errors.New("invalid parameter in Accept-* string")
 			}
 
 			s = remaining
@@ -577,10 +577,10 @@ func GetAcceptableOtherFromHeader(headerValue string, availableOthers []Other) (
 			extensionParameters[key] = value
 		}
 
-		for i, availableOther := range availableOthers {
-			if compareOthers(acceptableOther, availableOther) &&
-				getPrecedence(acceptableOther, weights[i].other) {
-				weights[i].other = acceptableOther
+		for i, availableCharsetOrEncoding := range availableCharsetOrEncodings {
+			if compareCharsetOrEncodings(acceptableCharsetOrEncoding, availableCharsetOrEncoding) &&
+				getPrecedence(acceptableCharsetOrEncoding, weights[i].other) {
+				weights[i].other = acceptableCharsetOrEncoding
 				weights[i].extensionParameters = extensionParameters
 				weights[i].weight = weight
 				weights[i].order = otherCount
@@ -592,7 +592,7 @@ func GetAcceptableOtherFromHeader(headerValue string, availableOthers []Other) (
 
 	// there must not be anything left after parsing the header
 	if len(s) > 0 {
-		return Other{}, Parameters{}, errors.New("invalid range in Accept-* string")
+		return CharsetOrEncoding{}, Parameters{}, errors.New("invalid range in Accept-* string")
 	}
 
 	resultIndex := -1
@@ -608,8 +608,8 @@ func GetAcceptableOtherFromHeader(headerValue string, availableOthers []Other) (
 	}
 
 	if resultIndex == -1 {
-		return Other{}, Parameters{}, errors.New("no acceptable value found")
+		return CharsetOrEncoding{}, Parameters{}, errors.New("no acceptable value found")
 	}
 
-	return availableOthers[resultIndex], weights[resultIndex].extensionParameters, nil
+	return availableCharsetOrEncodings[resultIndex], weights[resultIndex].extensionParameters, nil
 }

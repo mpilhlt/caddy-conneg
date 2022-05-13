@@ -1,4 +1,4 @@
-package cors
+package connegmatcher
 
 import (
 	"net/http"

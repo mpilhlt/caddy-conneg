@@ -1,4 +1,4 @@
-module github.com/mpilhlt/connegmatcher
+module github.com/mpilhlt/caddy-conneg
 
 go 1.18
 

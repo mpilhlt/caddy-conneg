@@ -38,7 +38,26 @@ The plugin can be configured via Caddyfile:
 * You must specify at least one of `match_types`, `match_languages`, `match_charsets`, and `match_encodings`. And when you specify one of the `var_*` parameters, the corresponding `match_` parameter must be defined as well.
 * Wildcards like `*` and `*/*` should work. If they don't behave as you expect, please open an issue.
 
-A [Caddyfile](./Caddyfile) with some combinations for testing is provided with this repository.
+A [Caddyfile](./Caddyfile) with some combinations for testing is provided with this repository. You can test it with commands like these:
+
+```shell
+$ curl -H "Accept: application/tei+xml" -H "Accept-Language: fr-FR" https://localhost/test?format=rdf\&lang=de\&enc=br
+RDF auf deutsch oder englisch, de preferred!
+$ curl -H "Accept: application/tei+xml" -H "Accept-Language: fr-FR" https://localhost/test?format=rdf
+RDF en français!
+$ curl -H "Accept: application/rdf+xml" -H "Accept-Language: en" https://localhost/test?lang=de
+RDF auf deutsch oder englisch, de preferred!
+$ curl -H "Accept: application/rdf+xml" -H "Accept-Language: en" https://localhost/test
+RDF auf deutsch oder englisch, English / English preferred!
+$ curl -H "Accept: application/rdf+xml" -H "Accept-Language: en, de;q=0.8" https://localhost/test
+RDF auf deutsch oder englisch, English / English preferred!
+$ curl -H "Accept: application/rdf+xml" -H "Accept-Language: de-DE" https://localhost/test
+RDF auf deutsch oder englisch, German / Deutsch preferred!
+$ curl -H "Accept: application/rdf+xml" https://localhost/test
+RDF!
+$ curl -H "Accept: text/html" -H "Accept-Language: fr-FR" -H "Accept-Encoding: br" https://localhost/test?format=html\&lang=de
+HTML, but brotli-compressed!
+```
 
 ## Libraries
 

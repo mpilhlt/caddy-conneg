@@ -80,13 +80,13 @@ type MatchConneg struct {
 	// Query string parameter key to override encoding negotiation. Default: ""
 	ForceEncodingQueryString string   `json:"force_encoding_query_string,omitempty"`
 	// Variable name (will be prefixed with `conneg_`) to hold result of content negotiation. Default: ""
-	VarType                  string   `json:"var_type, omitempty`
+	VarType                  string   `json:"var_type, omitempty"`
 	// Variable name (will be prefixed with `conneg_`) to hold result of language negotiation. Default: ""
-	VarLanguage              string   `json:"var_language, omitempty`
+	VarLanguage              string   `json:"var_language, omitempty"`
 	// Variable name (will be prefixed with `conneg_`) to hold result of charset negotiation. Default: ""
-	VarCharset               string   `json:"var_charset, omitempty`
+	VarCharset               string   `json:"var_charset, omitempty"`
 	// Variable name (will be prefixed with `conneg_`) to hold result of encoding negotiation. Default: ""
-	VarEncoding              string   `json:"var_encoding, omitempty`
+	VarEncoding              string   `json:"var_encoding, omitempty"`
 
 	// the following fields are populated internally/computationally
 	MatchTTypes     []contenttype.MediaType

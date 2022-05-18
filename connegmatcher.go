@@ -63,13 +63,13 @@ type CharsetOrEncoding struct {
 // COMPATIBILITY NOTE: This module is still experimental and is not
 // subject to Caddy's compatibility guarantee.
 type MatchConneg struct {
-	// List of content/mime types to match against (W3C RFC 2616, section 14.1). Default: Empty list
+	// List of content/mime types to match against ([IETF RFC 7231, section 5.3.2](https://datatracker.ietf.org/doc/html/rfc7231#section-5.3.2)). Default: Empty list
 	MatchTypes               []string `json:"match_types,omitempty"`
-	// List of language codes to match against (W3C RFC 2616, section 14.4). Default: Empty list
+	// List of language codes to match against ([IETF RFC 7231, section 5.3.5](https://datatracker.ietf.org/doc/html/rfc7231#section-5.3.5)). Default: Empty list
 	MatchLanguages           []string `json:"match_languages,omitempty"`
-	// List of character sets to match against (W3C RFC 2616, section 14.2). Default: Empty list
+	// List of character sets to match against ([IETF RFC 7231, section 5.3.3](https://datatracker.ietf.org/doc/html/rfc7231#section-5.3.3)). Default: Empty list
 	MatchCharsets            []string `json:"match_charsets,omitempty"`
-	// List of encodings to match against (W3C RFC 2616, section 14.3). Default: Empty list
+	// List of encodings to match against ([IETF RFC 7231, section 5.3.4](https://datatracker.ietf.org/doc/html/rfc7231#section-5.3.4)). Default: Empty list
 	MatchEncodings           []string `json:"match_encodings,omitempty"`
 	// Query string parameter key to override content negotiation. Default: ""
 	ForceTypeQueryString     string   `json:"force_type_query_string,omitempty"`

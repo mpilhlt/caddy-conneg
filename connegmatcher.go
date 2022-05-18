@@ -39,34 +39,53 @@ type CharsetOrEncoding struct {
 }
 
 // MatchConneg matches requests by comparing results of a
-// content negotiation process to a (list of) values.
+// content negotiation process to a (list of) value(s).
 //
 // Lists of media types, languages, charsets, and encodings to match
 // the request against can be given - and at least one of them MUST
 // be specified.
-// OPTIONAL parameters are a strings for identifying URL query string
+//
+// OPTIONAL parameters are strings for identifying URL query string
 // parameter keys that allow requests to override/skip the connection
 // negotiation process and force a media type, a language, a charset
-// or an encoding (all defaulting to '').
-// The values of query string parameter values corresponding to full
-// media types (languages, encodings, etc.) are hardcoded in a
-// variable called `aliases` below
+// or an encoding.
+//
+// Some shorthand values for query string parameters translating to
+// full media types (languages, encodings, etc.) are hardcoded in a
+// variable called `aliases`: They presently cover `htm` and `html` for
+// `text/html`, `rdf` for `application/rdf+xml`, `tei` and `xml` for
+// `application/tei+xml`, and `pdf` for `application/pdf`. For instance,
+// if `force_type_query_string` is set to `format`, a request uri
+// ending in `foo.com?format=tei` will result in content type
+// `application/tei+xml` and then succeed or not based on whether that
+// content type is listed in `match_types`.
 //
 // COMPATIBILITY NOTE: This module is still experimental and is not
 // subject to Caddy's compatibility guarantee.
 type MatchConneg struct {
-	// the following fields are populated by configuration
+	// List of content/mime types to match against (W3C RFC 2616, section 14.1). Default: Empty list
 	MatchTypes               []string `json:"match_types,omitempty"`
+	// List of language codes to match against (W3C RFC 2616, section 14.4). Default: Empty list
 	MatchLanguages           []string `json:"match_languages,omitempty"`
+	// List of character sets to match against (W3C RFC 2616, section 14.2). Default: Empty list
 	MatchCharsets            []string `json:"match_charsets,omitempty"`
+	// List of encodings to match against (W3C RFC 2616, section 14.3). Default: Empty list
 	MatchEncodings           []string `json:"match_encodings,omitempty"`
+	// Query string parameter key to override content negotiation. Default: ""
 	ForceTypeQueryString     string   `json:"force_type_query_string,omitempty"`
+	// Query string parameter key to override language negotiation. Default: ""
 	ForceLanguageQueryString string   `json:"force_language_query_string,omitempty"`
+	// Query string parameter key to override charset negotiation. Default: ""
 	ForceCharsetQueryString  string   `json:"force_charset_query_string,omitempty"`
+	// Query string parameter key to override encoding negotiation. Default: ""
 	ForceEncodingQueryString string   `json:"force_encoding_query_string,omitempty"`
+	// Variable name (will be prefixed with `conneg_`) to hold result of content negotiation. Default: ""
 	VarType                  string   `json:"var_type, omitempty`
+	// Variable name (will be prefixed with `conneg_`) to hold result of language negotiation. Default: ""
 	VarLanguage              string   `json:"var_language, omitempty`
+	// Variable name (will be prefixed with `conneg_`) to hold result of charset negotiation. Default: ""
 	VarCharset               string   `json:"var_charset, omitempty`
+	// Variable name (will be prefixed with `conneg_`) to hold result of encoding negotiation. Default: ""
 	VarEncoding              string   `json:"var_encoding, omitempty`
 
 	// the following fields are populated internally/computationally

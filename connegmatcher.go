@@ -53,11 +53,12 @@ type CharsetOrEncoding struct {
 // Some shorthand values for query string parameters translating to
 // full media types (languages, encodings, etc.) are hardcoded in a
 // variable called `aliases`: They presently cover `htm` and `html` for
-// `text/html`, `rdf` for `application/rdf+xml`, `tei` and `xml` for
-// `application/tei+xml`, and `pdf` for `application/pdf`. For instance,
-// if `force_type_query_string` is set to `format`, a request uri
-// ending in `foo.com?format=tei` will result in content type
-// `application/tei+xml` and then succeed or not based on whether that
+// `text/html`, `text` or `txt` for `text/plain`, `rdf` for
+// `application/rdf+xml`, `tei` and `xml` for `application/tei+xml`,
+// and `pdf` for `application/pdf`. For instance, if
+// `force_type_query_string` is set to `format`, a request uri ending
+// in `foo.com?format=tei` will result in content type
+// `application/tei+xml` and then succeed or not, based on whether that
 // content type is listed in `match_types`.
 //
 // COMPATIBILITY NOTE: This module is still experimental and is not
@@ -103,6 +104,7 @@ var aliases = map[string]interface{}{
 	"application/rdf+xml": []string{"rdf"},
 	"application/tei+xml": []string{"tei", "xml"},
 	"application/pdf":     []string{"pdf"},
+	"text/plain":	       []string{"txt", "text"},
 }
 
 func init() {

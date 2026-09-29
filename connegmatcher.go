@@ -65,46 +65,46 @@ type CharsetOrEncoding struct {
 // subject to Caddy's compatibility guarantee.
 type MatchConneg struct {
 	// List of content/mime types to match against ([IETF RFC 7231, section 5.3.2](https://datatracker.ietf.org/doc/html/rfc7231#section-5.3.2)). Default: Empty list
-	MatchTypes               []string `json:"match_types,omitempty"`
+	MatchTypes []string `json:"match_types,omitempty"`
 	// List of language codes to match against ([IETF RFC 7231, section 5.3.5](https://datatracker.ietf.org/doc/html/rfc7231#section-5.3.5)). Default: Empty list
-	MatchLanguages           []string `json:"match_languages,omitempty"`
+	MatchLanguages []string `json:"match_languages,omitempty"`
 	// List of character sets to match against ([IETF RFC 7231, section 5.3.3](https://datatracker.ietf.org/doc/html/rfc7231#section-5.3.3)). Default: Empty list
-	MatchCharsets            []string `json:"match_charsets,omitempty"`
+	MatchCharsets []string `json:"match_charsets,omitempty"`
 	// List of encodings to match against ([IETF RFC 7231, section 5.3.4](https://datatracker.ietf.org/doc/html/rfc7231#section-5.3.4)). Default: Empty list
-	MatchEncodings           []string `json:"match_encodings,omitempty"`
+	MatchEncodings []string `json:"match_encodings,omitempty"`
 	// Query string parameter key to override content negotiation. Default: ""
-	ForceTypeQueryString     string   `json:"force_type_query_string,omitempty"`
+	ForceTypeQueryString string `json:"force_type_query_string,omitempty"`
 	// Query string parameter key to override language negotiation. Default: ""
-	ForceLanguageQueryString string   `json:"force_language_query_string,omitempty"`
+	ForceLanguageQueryString string `json:"force_language_query_string,omitempty"`
 	// Query string parameter key to override charset negotiation. Default: ""
-	ForceCharsetQueryString  string   `json:"force_charset_query_string,omitempty"`
+	ForceCharsetQueryString string `json:"force_charset_query_string,omitempty"`
 	// Query string parameter key to override encoding negotiation. Default: ""
-	ForceEncodingQueryString string   `json:"force_encoding_query_string,omitempty"`
+	ForceEncodingQueryString string `json:"force_encoding_query_string,omitempty"`
 	// Variable name (will be prefixed with `conneg_`) to hold result of content negotiation. Default: ""
-	VarType                  string   `json:"var_type,omitempty"`
+	VarType string `json:"var_type,omitempty"`
 	// Variable name (will be prefixed with `conneg_`) to hold result of language negotiation. Default: ""
-	VarLanguage              string   `json:"var_language,omitempty"`
+	VarLanguage string `json:"var_language,omitempty"`
 	// Variable name (will be prefixed with `conneg_`) to hold result of charset negotiation. Default: ""
-	VarCharset               string   `json:"var_charset,omitempty"`
+	VarCharset string `json:"var_charset,omitempty"`
 	// Variable name (will be prefixed with `conneg_`) to hold result of encoding negotiation. Default: ""
-	VarEncoding              string   `json:"var_encoding,omitempty"`
+	VarEncoding string `json:"var_encoding,omitempty"`
 
 	// the following fields are populated internally/computationally
-	MatchTTypes     []contenttype.MediaType	`json:"omitempty"`
-	MatchTLanguages []language.Tag		`json:"omitempty"`
-	MatchTCharsets  []CharsetOrEncoding	`json:"omitempty"`
-	MatchTEncodings []CharsetOrEncoding	`json:"omitempty"`
-	LanguageMatcher language.Matcher	`json:"omitempty"`
+	MatchTTypes     []contenttype.MediaType `json:"omitempty"`
+	MatchTLanguages []language.Tag          `json:"omitempty"`
+	MatchTCharsets  []CharsetOrEncoding     `json:"omitempty"`
+	MatchTEncodings []CharsetOrEncoding     `json:"omitempty"`
+	LanguageMatcher language.Matcher        `json:"omitempty"`
 	logger          *zap.Logger
 }
 
 // If a type/language/etc is forced via parameter, these are values that the parameter can take
-var aliases = map[string]interface{}{
+var aliases = map[string][]string{
 	"text/html":           []string{"html", "htm"},
 	"application/rdf+xml": []string{"rdf"},
 	"application/tei+xml": []string{"tei", "xml"},
 	"application/pdf":     []string{"pdf"},
-	"text/plain":	       []string{"txt", "text"},
+	"text/plain":          []string{"txt", "text"},
 }
 
 func init() {
@@ -260,8 +260,10 @@ func (m MatchConneg) matchType(r *http.Request, offers []string, offerTypes []co
 	match, result := false, ""
 	if forceString != "" {
 		if err := r.ParseForm(); err != nil {
-			sugar := m.logger.Sugar()
-			sugar.Infof("Problem parsing URL: %+v", err)
+			if m.logger != nil {
+				sugar := m.logger.Sugar()
+				sugar.Infof("Problem parsing URL: %+v", err)
+			}
 			// return errors.New("One of match_types, match_languages, match_charsets, match_encodings MUST be set.")
 		} else {
 			if len(r.Form[forceString]) > 0 {
@@ -269,9 +271,8 @@ func (m MatchConneg) matchType(r *http.Request, offers []string, offerTypes []co
 					if t == r.Form[forceString][0] {
 						match, result = true, t
 					} else {
-						values, containsKey := aliases[t]
-						if containsKey {
-							if slices.Contains(values.([]string), r.Form[forceString][0]) {
+						if values, containsKey := aliases[t]; containsKey {
+							if slices.Contains(values, r.Form[forceString][0]) {
 								match, result = true, t
 							}
 						}
@@ -301,8 +302,10 @@ func (m MatchConneg) matchLanguage(r *http.Request, offers []string, forceString
 	match, result := false, ""
 	if forceString != "" {
 		if err := r.ParseForm(); err != nil {
-			sugar := m.logger.Sugar()
-			sugar.Infof("Problem parsing URL: %+v", err)
+			if m.logger != nil {
+				sugar := m.logger.Sugar()
+				sugar.Infof("Problem parsing URL: %+v", err)
+			}
 			// return errors.New("One of match_types, match_languages, match_charsets, match_encodings MUST be set.")
 		} else {
 			if len(r.Form[forceString]) > 0 {
@@ -310,9 +313,8 @@ func (m MatchConneg) matchLanguage(r *http.Request, offers []string, forceString
 					if t == r.Form[forceString][0] {
 						match, result = true, t
 					} else {
-						values, containsKey := aliases[t]
-						if containsKey {
-							if slices.Contains(values.([]string), r.Form[forceString][0]) {
+						if values, containsKey := aliases[t]; containsKey {
+							if slices.Contains(values, r.Form[forceString][0]) {
 								match, result = true, t
 							}
 						}
@@ -342,8 +344,10 @@ func (m MatchConneg) matchCharsetOrEncoding(r *http.Request, offers []string, of
 	match, result := false, ""
 	if forceString != "" {
 		if err := r.ParseForm(); err != nil {
-			sugar := m.logger.Sugar()
-			sugar.Infof("Problem parsing URL: %+v", err)
+			if m.logger != nil {
+				sugar := m.logger.Sugar()
+				sugar.Infof("Problem parsing URL: %+v", err)
+			}
 			// return errors.New("One of match_types, match_languages, match_charsets, match_encodings MUST be set.")
 		} else {
 			if len(r.Form[forceString]) > 0 {
@@ -351,9 +355,8 @@ func (m MatchConneg) matchCharsetOrEncoding(r *http.Request, offers []string, of
 					if t == r.Form[forceString][0] {
 						match, result = true, t
 					} else {
-						values, containsKey := aliases[t]
-						if containsKey {
-							if slices.Contains(values.([]string), r.Form[forceString][0]) {
+						if values, containsKey := aliases[t]; containsKey {
+							if slices.Contains(values, r.Form[forceString][0]) {
 								match, result = true, t
 							}
 						}
@@ -466,38 +469,31 @@ func consumeParameter(s string) (string, string, string, bool) {
 
 func getWeight(s string) (int, bool) {
 	// RFC 7231, 5.3.1. Quality Values
-	result := 0
-	multiplier := 1000
+	if s == "0" {
+		return 0, true
+	}
+	if s == "1" {
+		return 1000, true
+	}
 
 	// the string must not have more than three digits after the decimal point
-	if len(s) > 5 {
+	if len(s) < 3 || len(s) > 5 || s[1] != '.' {
+		return 0, false
+	}
+	if s[0] != '0' && s[0] != '1' {
 		return 0, false
 	}
 
-	for i := 0; i < len(s); i++ {
-		if i == 0 {
-			// the first character must be 0 or 1
-			if s[i] != '0' && s[i] != '1' {
-				return 0, false
-			}
-
-			result = int(s[i]-'0') * multiplier
-			multiplier /= 10
-		} else if i == 1 {
-			// the second character must be a dot
-			if s[i] != '.' {
-				return 0, false
-			}
-		} else {
-			// the remaining characters must be digits and the value can not be greater than 1.000
-			if (s[0] == '1' && s[i] != '0') ||
-				!isDigitChar(s[i]) {
-				return 0, false
-			}
-
-			result += int(s[i]-'0') * multiplier
-			multiplier /= 10
+	result := int(s[0]-'0') * 1000
+	multiplier := 100
+	for i := 2; i < len(s); i++ {
+		// the remaining characters must be digits and the value can not be greater than 1.000
+		if (s[0] == '1' && s[i] != '0') || !isDigitChar(s[i]) {
+			return 0, false
 		}
+
+		result += int(s[i]-'0') * multiplier
+		multiplier /= 10
 	}
 
 	return result, true

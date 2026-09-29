@@ -136,11 +136,13 @@ func TestMatchStoresSelectedVars(t *testing.T) {
 		t.Fatal("expected request to match")
 	}
 
-	if got := caddyhttp.GetVar(req.Context(), "conneg_format"); got != "text/html" {
-		t.Fatalf("expected conneg_format to be text/html, got %v", got)
+	typeKey := "conneg_" + matcher.VarType
+	if got := caddyhttp.GetVar(req.Context(), typeKey); got != "text/html" {
+		t.Fatalf("expected %s to be text/html, got %v", typeKey, got)
 	}
 	wantLanguage := display.English.Tags().Name(language.English) + "/" + display.Self.Name(language.English)
-	if got := caddyhttp.GetVar(req.Context(), "conneg_language"); got != wantLanguage {
-		t.Fatalf("expected conneg_language to be %q, got %v", wantLanguage, got)
+	languageKey := "conneg_" + matcher.VarLanguage
+	if got := caddyhttp.GetVar(req.Context(), languageKey); got != wantLanguage {
+		t.Fatalf("expected %s to be %q, got %v", languageKey, wantLanguage, got)
 	}
 }

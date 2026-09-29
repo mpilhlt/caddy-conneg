@@ -17,8 +17,12 @@ func newRequest(method, target string) *http.Request {
 	return req
 }
 
-func testContext() caddy.Context {
-	var ctx caddy.Context
+func testContext(tb testing.TB) caddy.Context {
+	tb.Helper()
+
+	ctx, cancel := caddy.NewContext(caddy.Context{Context: context.Background()})
+	tb.Cleanup(cancel)
+
 	return ctx
 }
 
@@ -71,7 +75,7 @@ func TestMatchTypeQueryOverride(t *testing.T) {
 		MatchLanguages:           []string{"en"},
 		ForceLanguageQueryString: "lang",
 	}
-	if err := matcher.Provision(testContext()); err != nil {
+	if err := matcher.Provision(testContext(t)); err != nil {
 		t.Fatalf("provision failed: %v", err)
 	}
 
@@ -85,7 +89,7 @@ func TestMatchLanguageAcceptHeader(t *testing.T) {
 	matcher := MatchConneg{
 		MatchLanguages: []string{"en", "de"},
 	}
-	if err := matcher.Provision(testContext()); err != nil {
+	if err := matcher.Provision(testContext(t)); err != nil {
 		t.Fatalf("provision failed: %v", err)
 	}
 
@@ -100,7 +104,7 @@ func TestMatchCharsetAcceptsQualityOne(t *testing.T) {
 	matcher := MatchConneg{
 		MatchCharsets: []string{"utf-8"},
 	}
-	if err := matcher.Provision(testContext()); err != nil {
+	if err := matcher.Provision(testContext(t)); err != nil {
 		t.Fatalf("provision failed: %v", err)
 	}
 
@@ -118,7 +122,7 @@ func TestMatchStoresSelectedVars(t *testing.T) {
 		VarType:        "format",
 		VarLanguage:    "language",
 	}
-	if err := matcher.Provision(testContext()); err != nil {
+	if err := matcher.Provision(testContext(t)); err != nil {
 		t.Fatalf("provision failed: %v", err)
 	}
 
@@ -133,7 +137,7 @@ func TestMatchStoresSelectedVars(t *testing.T) {
 	if got := caddyhttp.GetVar(req.Context(), "conneg_format"); got != "text/html" {
 		t.Fatalf("expected conneg_format to be text/html, got %v", got)
 	}
-	if got := caddyhttp.GetVar(req.Context(), "conneg_language"); got == nil {
-		t.Fatal("expected conneg_language to be set")
+	if got := caddyhttp.GetVar(req.Context(), "conneg_language"); got != "English/English" {
+		t.Fatalf("expected conneg_language to be English/English, got %v", got)
 	}
 }

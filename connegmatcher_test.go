@@ -8,6 +8,8 @@ import (
 
 	"github.com/caddyserver/caddy/v2"
 	"github.com/caddyserver/caddy/v2/modules/caddyhttp"
+	"golang.org/x/text/language"
+	"golang.org/x/text/language/display"
 )
 
 func newRequest(method, target string) *http.Request {
@@ -137,7 +139,8 @@ func TestMatchStoresSelectedVars(t *testing.T) {
 	if got := caddyhttp.GetVar(req.Context(), "conneg_format"); got != "text/html" {
 		t.Fatalf("expected conneg_format to be text/html, got %v", got)
 	}
-	if got := caddyhttp.GetVar(req.Context(), "conneg_language"); got != "English/English" {
-		t.Fatalf("expected conneg_language to be English/English, got %v", got)
+	wantLanguage := display.English.Tags().Name(language.English) + "/" + display.Self.Name(language.English)
+	if got := caddyhttp.GetVar(req.Context(), "conneg_language"); got != wantLanguage {
+		t.Fatalf("expected conneg_language to be %q, got %v", wantLanguage, got)
 	}
 }

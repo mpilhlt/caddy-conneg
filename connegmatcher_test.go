@@ -1,90 +1,148 @@
 package connegmatcher
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
-	"regexp"
 	"testing"
+
+	"github.com/caddyserver/caddy/v2"
+	"github.com/caddyserver/caddy/v2/modules/caddyhttp"
+	"golang.org/x/text/language"
+	"golang.org/x/text/language/display"
 )
 
-func getReq(method string) (*httptest.ResponseRecorder, *http.Request) {
-	w := httptest.NewRecorder()
-	r, _ := http.NewRequest(method, "http://foo.com", nil)
-	r.Header.Set(requestMethodKey, "POST")
-	return w, r
+func newRequest(method, target string) *http.Request {
+	req := httptest.NewRequest(method, target, nil)
+	req.Header.Set("Origin", "http://example.com")
+	req = req.WithContext(context.WithValue(req.Context(), caddyhttp.VarsCtxKey, map[string]any{}))
+	return req
 }
 
-func TestDefault_NoOrigin(t *testing.T) {
-	w, r := getReq("OPTIONS")
-	Default().HandleRequest(w, r)
-	if w.Header().Get(allowOriginKey) != "" {
-		t.Fatal("Should not have origin header when no origin passed in")
-	}
+func testContext(tb testing.TB) caddy.Context {
+	tb.Helper()
+
+	ctx, cancel := caddy.NewContext(caddy.Context{Context: context.Background()})
+	tb.Cleanup(cancel)
+
+	return ctx
 }
 
-func TestDefault_Origin_Supplied(t *testing.T) {
-	w, r := getReq("OPTIONS")
-	r.Header.Set(originKey, "http://bar.com")
-	Default().HandleRequest(w, r)
-	if w.Header().Get(allowOriginKey) != "*" {
-		t.Fatalf("Expect origin of \"*\". Got \"%s\".", w.Header().Get(allowOriginKey))
-	}
-	if w.Header().Get(varyKey) != "Origin" {
-		t.Fatal("Must include Vary:Origin if allow origin header set to specific domain.")
-	}
-}
-
-func TestDefault_Dissallowed_Origin(t *testing.T) {
-	w, r := getReq("OPTIONS")
-	r.Header.Set(originKey, "http://bar.com")
-	c := Default()
-	c.AllowedOrigins = []string{"http://blog.bar.com"}
-	c.HandleRequest(w, r)
-	if w.Header().Get(allowOriginKey) != "" {
-		t.Fatal("Should not have origin header when no origin not explicitely allowed")
-	}
-}
-
-func TestDefault_Allowed_Origin_By_Regexp(t *testing.T) {
-	c := Default()
-	c.AllowedOrigins = []string{}
-	c.OriginRegexps = []*regexp.Regexp{
-		regexp.MustCompile(".+\\.example\\.com$"),
-		regexp.MustCompile("^http\\:\\/\\/(.+)\\.other\\.org$"),
-	}
-
-	allowedOrigins := []string{"http://foo.example.com", "http://bar.other.org"}
-
-	for _, origin := range allowedOrigins {
-		w, r := getReq("OPTIONS")
-		r.Header.Set(originKey, origin)
-		c.HandleRequest(w, r)
-		if w.Header().Get(allowOriginKey) != origin {
-			t.Fatal("Should have origin header with the request origin when the regexp matches")
+func TestValidate(t *testing.T) {
+	t.Run("requires matcher", func(t *testing.T) {
+		if err := (MatchConneg{}).Validate(); err == nil {
+			t.Fatal("expected validation to fail without any match criteria")
 		}
-	}
+	})
 
+	t.Run("allows variables when offers exist", func(t *testing.T) {
+		err := (MatchConneg{
+			MatchTypes: []string{"text/html"},
+			VarType:    "format",
+		}).Validate()
+		if err != nil {
+			t.Fatalf("expected validation to succeed, got %v", err)
+		}
+	})
 }
 
-func TestDefault_Methods(t *testing.T) {
-	w, r := getReq("OPTIONS")
-	r.Header.Set(originKey, "http://bar.com")
-	c := Default()
-	c.HandleRequest(w, r)
-	if w.Header().Get(allowMethodsKey) != "POST, GET, OPTIONS, PUT, DELETE" {
-		t.Fatal("Allow methods should be set")
+func TestGetWeight(t *testing.T) {
+	tests := map[string]int{
+		"0":     0,
+		"0.5":   500,
+		"0.50":  500,
+		"0.500": 500,
+		"1":     1000,
+		"1.0":   1000,
+		"1.000": 1000,
+	}
+
+	for input, want := range tests {
+		t.Run(input, func(t *testing.T) {
+			got, ok := getWeight(input)
+			if !ok {
+				t.Fatalf("expected %q to parse", input)
+			}
+			if got != want {
+				t.Fatalf("expected %q to parse to %d, got %d", input, want, got)
+			}
+		})
 	}
 }
 
-func TestDefault_AllowAllHeaders(t *testing.T) {
-	w, r := getReq("OPTIONS")
-	c := Default()
-	c.AllowedHeaders = "*"
-	reqHeaders := "Bar, Foo, X-Yz"
-	r.Header.Set(originKey, "http://bar.com")
-	r.Header.Set(requestHeadersKey, reqHeaders)
-	c.HandleRequest(w, r)
-	if w.Header().Get(allowHeadersKey) != reqHeaders {
-		t.Fatal("If AllowedHeaders is *, it should copy the value of requestHeadersKey to allowHeadersKey")
+func TestMatchTypeQueryOverride(t *testing.T) {
+	matcher := MatchConneg{
+		MatchTypes:               []string{"application/tei+xml", "application/rdf+xml"},
+		ForceTypeQueryString:     "format",
+		MatchLanguages:           []string{"en"},
+		ForceLanguageQueryString: "lang",
+	}
+	if err := matcher.Provision(testContext(t)); err != nil {
+		t.Fatalf("provision failed: %v", err)
+	}
+
+	req := newRequest(http.MethodGet, "https://example.com/resource?format=tei&lang=en")
+	if !matcher.Match(req) {
+		t.Fatal("expected query string override to select an offered media type")
+	}
+}
+
+func TestMatchLanguageAcceptHeader(t *testing.T) {
+	matcher := MatchConneg{
+		MatchLanguages: []string{"en", "de"},
+	}
+	if err := matcher.Provision(testContext(t)); err != nil {
+		t.Fatalf("provision failed: %v", err)
+	}
+
+	req := newRequest(http.MethodGet, "https://example.com/resource")
+	req.Header.Set("Accept-Language", "de-DE,de;q=0.8")
+	if !matcher.Match(req) {
+		t.Fatal("expected language negotiation to match")
+	}
+}
+
+func TestMatchCharsetAcceptsQualityOne(t *testing.T) {
+	matcher := MatchConneg{
+		MatchCharsets: []string{"utf-8"},
+	}
+	if err := matcher.Provision(testContext(t)); err != nil {
+		t.Fatalf("provision failed: %v", err)
+	}
+
+	req := newRequest(http.MethodGet, "https://example.com/resource")
+	req.Header.Set("Accept-Charset", "utf-8;q=1")
+	if !matcher.Match(req) {
+		t.Fatal("expected charset negotiation to accept q=1")
+	}
+}
+
+func TestMatchStoresSelectedVars(t *testing.T) {
+	matcher := MatchConneg{
+		MatchTypes:     []string{"text/html"},
+		MatchLanguages: []string{"en"},
+		VarType:        "format",
+		VarLanguage:    "language",
+	}
+	if err := matcher.Provision(testContext(t)); err != nil {
+		t.Fatalf("provision failed: %v", err)
+	}
+
+	req := newRequest(http.MethodGet, "https://example.com/resource")
+	req.Header.Set("Accept", "text/html")
+	req.Header.Set("Accept-Language", "en")
+
+	if !matcher.Match(req) {
+		t.Fatal("expected request to match")
+	}
+
+	typeKey := "conneg_" + matcher.VarType
+	if got := caddyhttp.GetVar(req.Context(), typeKey); got != "text/html" {
+		t.Fatalf("expected %s to be text/html, got %v", typeKey, got)
+	}
+	wantLanguage := display.English.Tags().Name(language.English) + "/" + display.Self.Name(language.English)
+	languageKey := "conneg_" + matcher.VarLanguage
+	if got := caddyhttp.GetVar(req.Context(), languageKey); got != wantLanguage {
+		t.Fatalf("expected %s to be %q, got %v", languageKey, wantLanguage, got)
 	}
 }
